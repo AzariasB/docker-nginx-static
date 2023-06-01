@@ -1,10 +1,16 @@
-[![](https://images.microbadger.com/badges/image/flashspys/nginx-static.svg)](https://microbadger.com/images/flashspys/nginx-static "Get your own image badge on microbadger.com") ![](https://img.shields.io/docker/pulls/flashspys/nginx-static.svg)
+# Custom Nginx Image
 
-# Super Lightweight Nginx Image
+This is a fork of the excellent [https://github.com/docker-nginx-static/docker-nginx-static](https://github.com/docker-nginx-static/docker-nginx-static). With a few changes :
 
-`docker run -v /absolute/path/to/serve:/static -p 8080:80 flashspys/nginx-static`
+ - The gzip_static and gunzip modules are not installed. The reverse proxy should be in charge of doing the compression
+ - The http_realip module is installed, to show the actual client ip in the logs instead of the proxy ip. The module needs to be configured with the `set_real_ip_from` config
+ - Access logs and error logs are enabled by default
+ - A custom "/healthz" route is added to have an easy healthcheck endpoint. This route has logs disabled for obvious reasons
+ - The server tokens are completely disabled. This obviously doesn't stop from attacks, but at leat gives less informations about the server
 
-This command exposes an nginx server on port 8080 which serves the folder `/absolute/path/to/serve` from the host.
+`docker run -v /absolute/path/to/serve:/static -p 8080:80 azariasb/nginx-static`
+
+This command exposes an nginx server on port 80 which serves the folder `/absolute/path/to/serve` from the host.
 
 The image can only be used for static file serving but has with **less than 4 MB** roughly 1/10 the size of the official nginx image. The running container needs **~1 MB RAM**.
 

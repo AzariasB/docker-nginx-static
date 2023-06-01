@@ -1,6 +1,6 @@
 FROM alpine:3.18
 
-LABEL maintainer="Felix Wehnert <felix@wehnert.me>,Maximilian Hippler <hello@maximilian.dev>"
+LABEL maintainer="Felix Wehnert <felix@wehnert.me>,Maximilian Hippler <hello@maximilian.dev>, Azarias B."
 
 # renovate: datasource=docker depName=library/nginx versioning=semver
 ENV NGINX_VERSION 1.25.0
@@ -29,9 +29,8 @@ RUN GPG_KEYS="B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	--http-scgi-temp-path=/var/cache/nginx/scgi_temp \
 	--user=nginx \
 	--group=nginx \
-	--with-http_gunzip_module \
-	--with-http_gzip_static_module \
 	--with-threads \
+    --with-http_realip_module \
 	--with-file-aio \
 	" \
 	&& addgroup -S nginx \
@@ -69,6 +68,10 @@ RUN GPG_KEYS="B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& rm -rf "$GNUPGHOME" nginx.tar.gz.asc \
 	&& tar -zx --strip-components=1 -f nginx.tar.gz \
 	&& rm nginx.tar.gz \
+	&& sed -i 's@"nginx/"@"-/"@g' src/core/nginx.h \
+	&& sed -i 's@r->headers_out.server == NULL@0@g' src/http/ngx_http_header_filter_module.c \
+	&& sed -i 's@r->headers_out.server == NULL@0@g' src/http/v2/ngx_http_v2_filter_module.c \
+	&& sed -i 's@<hr><center>nginx</center>@@g' src/http/ngx_http_special_response.c \
 	# Mitigate Shellcheck 2086, we want to split words
 	&& make_config() { \
 	for config_element in $CONFIG; do set -- "$@" "$config_element"; done; \
