@@ -1,16 +1,16 @@
-FROM alpine:3.21
+FROM alpine:3.21 AS build
 
 LABEL maintainer="Felix Wehnert <felix@wehnert.me>,Maximilian Hippler <hello@maximilian.dev>, Azarias B."
 
 # renovate: datasource=docker depName=library/nginx versioning=semver
-ENV NGINX_VERSION 1.27.4
+ENV NGINX_VERSION=1.27.4
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 WORKDIR /usr/src
 
 RUN GPG_KEYS="41DB92713D3BF4BFF3EE91069C5E7FA2F54977D4 \
 	D6786CE303D9A9022998DC6CC8464D549AF75C0A \
- 	43387825DDB1BB97EC36BA5D007C8D7C15D87369 \
+	43387825DDB1BB97EC36BA5D007C8D7C15D87369 \
 	7338973069ED3F443F4D37DFA64FD5B17ADB39A8 \
 	13C82A63B603576156E30A4EA0EA981B66B0D967 \
 	573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62" \
@@ -31,7 +31,7 @@ RUN GPG_KEYS="41DB92713D3BF4BFF3EE91069C5E7FA2F54977D4 \
 	--user=nginx \
 	--group=nginx \
 	--with-threads \
-    --with-http_realip_module \
+	--with-http_realip_module \
 	--with-file-aio \
 	" \
 	&& addgroup -S nginx \
@@ -118,21 +118,34 @@ RUN GPG_KEYS="41DB92713D3BF4BFF3EE91069C5E7FA2F54977D4 \
 	&& apk del .build-deps \
 	&& apk del .gettext \
 	&& mv /tmp/envsubst /usr/local/bin/ \
-	\
-	# Bring in tzdata so users could set the timezones through the environment
-	# variables
-	&& apk add --no-cache tzdata \
-	\
-	# forward request and error logs to docker log collector
-	&& ln -sf /dev/stdout /var/log/nginx/access.log \
-	&& ln -sf /dev/stderr /var/log/nginx/error.log \
 	&& mkdir /static
+
+FROM scratch
+
+COPY --from=build \
+	/lib/ld-musl-x86_64.so.1 \
+	/usr/lib/libpcre.so.1 \
+	/usr/lib/libz.so.1 \
+	/lib/
+
+COPY --from=build /var/log /var/log
+COPY --from=build /etc/nginx /etc/nginx
+COPY --from=build /etc/passwd /etc/group /etc/
+COPY --from=build /usr/sbin/nginx /usr/sbin/
+COPY --from=build /var/cache/nginx /var/cache/nginx
+COPY --from=build /var/run /var/run
+COPY --from=build /usr/sbin/nginx /usr/sbin/nginx
+COPY --from=build /static /static
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY nginx.vh.default.conf /etc/nginx/conf.d/default.conf
+RUN --mount=type=bind,from=build,source=/,target=/mount ["/mount/bin/busybox", "ln", "-sf", "/dev/stdout", "/var/log/nginx/access.log"]
+RUN --mount=type=bind,from=build,source=/,target=/mount ["/mount/bin/busybox", "ln", "-sf", "/dev/stderr", "/var/log/nginx/error.log"]
+
 
 EXPOSE 80
 
 STOPSIGNAL SIGTERM
 
-CMD ["nginx", "-g", "daemon off;"]
+
+CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
