@@ -2,13 +2,16 @@
 
 This is a fork of the excellent [https://github.com/docker-nginx-static/docker-nginx-static](https://github.com/docker-nginx-static/docker-nginx-static). With a few changes :
 
+ - The image is distroless, meaning it only contains the nginx executables and necessary files for it to run. Thus it is not possible to connect to the container with a shell.
  - The gzip_static and gunzip modules are not installed. The reverse proxy should be in charge of doing the compression
  - The http_realip module is installed, to show the actual client ip in the logs instead of the proxy ip. The module needs to be configured with the `set_real_ip_from` config
  - Access logs and error logs are enabled by default
  - A custom "/healthz" route is added to have an easy healthcheck endpoint. This route has logs disabled for obvious reasons
  - The server tokens are completely disabled. This obviously doesn't stop from attacks, but at leat gives less informations about the server
 
-`docker run -v /absolute/path/to/serve:/static -p 8080:80 azariasb/nginx-static`
+```shell
+docker run -v /absolute/path/to/serve:/static -p 8080:80 azariasb/nginx-static`
+```
 
 This command exposes an nginx server on port 80 which serves the folder `/absolute/path/to/serve` from the host.
 
@@ -24,7 +27,7 @@ This is an example entry for a `docker-compose.yaml`
 version: '3'
 services:
   example.org:
-    image: flashspys/nginx-static
+    image: azariasb/nginx-static
     container_name: example.org
     ports:
       - 8080:80
@@ -33,20 +36,20 @@ services:
 ```
 
 
-## nginx-static with træfik 2.x
+## nginx-static with træfik 3.x
 
-To use nginx-static with træfik 2.x add an entry to your services in a docker-compose.yaml. To set up traefik look at this [simple example](https://docs.traefik.io/user-guides/docker-compose/basic-example/). 
+To use nginx-static with træfik 3.x add an entry to your services in a docker-compose.yaml. To set up traefik look at this [simple example](https://docs.traefik.io/user-guides/docker-compose/basic-example/). 
 
 In the following example, replace everything contained in \<angle brackets\> and the domain with your values.
 
 ```yaml
 services:
   traefik:
-    image: traefik:2.4 # check if there is a newer version
+    image: traefik:3.3 # check if there is a newer version
   # Your traefik config.
     ...
   example.org:
-    image: flashspys/nginx-static
+    image: azariasb/nginx-static
     container_name: example.org
     expose:
       - 80
@@ -69,14 +72,13 @@ For a traefik 1.7 example look [at an old version of the readme](https://github.
 nginx-static is also suitable for multi-stage builds. This is an example Dockerfile for a static node.js application:
 
 ```dockerfile
-FROM node:alpine
+FROM node:alpine AS build
 WORKDIR /usr/src/app
 COPY . /usr/src/app
 RUN npm install && npm run build
 
-FROM flashspys/nginx-static
-RUN apk update && apk upgrade
-COPY --from=0 /usr/src/app/dist /static
+FROM azariasb/nginx-static
+COPY --from=build /usr/src/app/dist /static
 ```
 
 ### Custom nginx config
@@ -85,7 +87,6 @@ In the case you already have your own Dockerfile you can easily adjust the nginx
 
 ```dockerfile
 …
-FROM flashspys/nginx-static
-RUN rm -rf /etc/nginx/conf.d/default.conf
+FROM azariasb/nginx-static
 COPY your-custom-nginx.conf /etc/nginx/conf.d/default.conf
 ```

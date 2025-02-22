@@ -66,9 +66,7 @@ RUN GPG_KEYS="41DB92713D3BF4BFF3EE91069C5E7FA2F54977D4 \
 	done; \
 	test -z "$found" && echo >&2 "error: failed to fetch GPG keys $GPG_KEYS" && exit 1; \
 	gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz \
-	&& rm -rf "$GNUPGHOME" nginx.tar.gz.asc \
 	&& tar -zx --strip-components=1 -f nginx.tar.gz \
-	&& rm nginx.tar.gz \
 	&& sed -i 's@"nginx/"@"-/"@g' src/core/nginx.h \
 	&& sed -i 's@r->headers_out.server == NULL@0@g' src/http/ngx_http_header_filter_module.c \
 	&& sed -i 's@r->headers_out.server == NULL@0@g' src/http/v2/ngx_http_v2_filter_module.c \
@@ -94,31 +92,7 @@ RUN GPG_KEYS="41DB92713D3BF4BFF3EE91069C5E7FA2F54977D4 \
 	&& install -m644 html/50x.html /usr/share/nginx/html/ \
 	&& install -m755 objs/nginx-debug /usr/sbin/nginx-debug \
 	&& ln -s ../../usr/lib/nginx/modules /etc/nginx/modules \
-	&& strip /usr/sbin/nginx* \
-	&& rm -rf /usr/src \
-	\
-	# Bring in gettext so we can get `envsubst`, then throw
-	# the rest away. To do this, we need to install `gettext`
-	# then move `envsubst` out of the way so `gettext` can
-	# be deleted completely, then move `envsubst` back.
-	&& apk add --no-cache --virtual .gettext gettext \
-	&& mv /usr/bin/envsubst /tmp/\
-	&& runDeps="$( \
-	scanelf --needed --nobanner --format '%n#p' /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
-	| tr ',' '\n' \
-	| sort -u \
-	| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
-	)" \
-	# Mitigate Shellcheck 2086, we want to split words
-	&& install_deps() { \
-	for dep in $runDeps; do set -- "$dep" "$@"; done; \
-	apk add --no-cache --virtual .nginx-rundeps "$@"; \
-	} \
-	&& install_deps \
-	&& apk del .build-deps \
-	&& apk del .gettext \
-	&& mv /tmp/envsubst /usr/local/bin/ \
-	&& mkdir /static
+	&& strip /usr/sbin/nginx*
 
 FROM scratch
 
@@ -135,12 +109,12 @@ COPY --from=build /usr/sbin/nginx /usr/sbin/
 COPY --from=build /var/cache/nginx /var/cache/nginx
 COPY --from=build /var/run /var/run
 COPY --from=build /usr/sbin/nginx /usr/sbin/nginx
-COPY --from=build /static /static
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY nginx.vh.default.conf /etc/nginx/conf.d/default.conf
 RUN --mount=type=bind,from=build,source=/,target=/mount ["/mount/bin/busybox", "ln", "-sf", "/dev/stdout", "/var/log/nginx/access.log"]
 RUN --mount=type=bind,from=build,source=/,target=/mount ["/mount/bin/busybox", "ln", "-sf", "/dev/stderr", "/var/log/nginx/error.log"]
+RUN --mount=type=bind,from=build,source=/,target=/mount ["/mount/bin/busybox", "mkdir","/static"]
 
 
 EXPOSE 80
