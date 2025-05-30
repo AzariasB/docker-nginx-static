@@ -1,4 +1,4 @@
-FROM alpine:3.21 AS build
+FROM alpine:3.22 AS build
 
 LABEL maintainer="Felix Wehnert <felix@wehnert.me>,Maximilian Hippler <hello@maximilian.dev>, Azarias B."
 
